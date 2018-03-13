@@ -1,5 +1,6 @@
 #pragma once
 #define MAX_VOICEID_LEN 10
+#define MAX_TEXTBOX_STRING_LEN 1024
 #define MAX_VOICEID_LEN_NEED_MAPPING (sizeof(VoiceIdAdjustAdder) / sizeof(*VoiceIdAdjustAdder) - 1)
 #define NUM_MAPPING (sizeof(VoiceIdMapping) / sizeof(*VoiceIdMapping))
 static const int VoiceIdAdjustAdder[] = { 111110, 111100, 111000, 110000, 100000, 000000};

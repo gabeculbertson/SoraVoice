@@ -35,7 +35,13 @@ static MODULEINFO mi_exe;
 
 int StartSoraVoice(void* mh)
 {
+	/*TCHAR pwd[MAX_PATH];
+	GetCurrentDirectory(MAX_PATH, pwd);
+	MessageBox(NULL, pwd, pwd, 0);*/
+
 	LOG("Starting SoraVoice...");
+	
+	//SoraVoiceLib::Class1::DoTest();
 
 	if (!GetModuleInformation(GetCurrentProcess(), GetModuleHandleA(NULL), &mi_exe, sizeof(mi_exe))) {
 		return 0;

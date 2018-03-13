@@ -1,5 +1,6 @@
-
 #include "SoraVoice.h"
+
+#include <TextHook.h>
 
 #include <SVData.h>
 
@@ -22,10 +23,22 @@
 #include <ctime>
 #include <cstring>
 
+#include <sstream>
+#include <iostream>
+#include <iomanip>
+
+#include <stdlib.h>
+
 #include <dinput.h>
+
+//#using <SoraVoiceLib.dll>
+//#include <LineToVoice\voice_map.h>
+
 #ifndef DID
 #define DID IDirectInputDevice
 #endif // !DID
+
+using namespace std;
 
 using LockGuard = std::lock_guard<std::mutex>;
 using Draw::InfoType;
@@ -87,6 +100,8 @@ constexpr unsigned TIME_PREC = 16;
 
 constexpr int KEYS_NUM = 256;
 
+std::string game_names[] = { "invalid", "ed6fc", "ed6sc", "ed6t3" };
+
 struct Keys {
 	const byte* const &keys;
 	DID* const pDID;
@@ -108,11 +123,11 @@ struct AutoPlay {
 	unsigned time_autoplayv = 0;
 
 	AutoPlay(unsigned& now, unsigned &count_ch,
-			unsigned &wait, unsigned &time_textbeg,
-			unsigned &waitv)
-	:now(now),
-	count_ch(count_ch), wait(wait), time_textbeg(time_textbeg),
-	waitv(waitv) {
+		unsigned &wait, unsigned &time_textbeg,
+		unsigned &waitv)
+		:now(now),
+		count_ch(count_ch), wait(wait), time_textbeg(time_textbeg),
+		waitv(waitv) {
 	}
 };
 
@@ -193,50 +208,99 @@ static void stopCallBack(PlayID playID, StopType stopType)
 	} //if (playID == this->playID)
 }
 
+constexpr char hexmap[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+std::string ToHexStringKey(const byte* data, int len)
+{
+	std::string s;
+	int inPrefix = 0;
+	for (int i = 0; i <= len; i++) {
+		if (data[i] == 0x02) break;
+		if (data[i] < 0x20) continue;
+		s.push_back(hexmap[(data[i] & 0xF0) >> 4]);
+		s.push_back(hexmap[data[i] & 0x0F]);
+	}
+	return s;
+}
 
+std::string lastPlayed = "";
+int lastCharPointer = 0;
 void SoraVoice::Play(const char* t)
 {
 	if (!SV.status.startup) return;
 
-	if (*t != '#') return;
-	t++;
+	bool isOneStepForward = abs((int)t - lastCharPointer) <= 4;
+	lastCharPointer = (int)t;
+
+	std::string str_utterance;
+	for (int i = 0; i < MAX_TEXTBOX_STRING_LEN; i++) {
+		if (*(t + i) == 0x02) break;
+		str_utterance.push_back(*(t + i));
+	}
+	std::string str_matched_vid = ToHexStringKey((byte*)t, str_utterance.length());
+
+	LOG("scene is: %d     %d", lastCharPointer, (int)t);
 
 	std::string str_vid;
-	unsigned num_vid = 0;
-	for (int i = 0; i < MAX_VOICEID_LEN; i++) {
-		if (*t < '0' || *t > '9') break;
-		num_vid *= 10; num_vid += *t - '0';
-		str_vid.push_back(*t);
+	if (globalSceneLines.count(str_matched_vid) > 0) {
+		if (lastPlayed == str_matched_vid) return;
 
+		str_vid = globalSceneLines[str_matched_vid];
+		lastPlayed = str_matched_vid;
+		TextHook::HandleText(game_names[SV.game], str_utterance, str_vid);
+
+		LOG("scene is: \"%s\"", globalScene.c_str());
+		LOG("input text is: \"%s\"", str_utterance.c_str());
+		LOG("input bytes is: \"%s\"", str_matched_vid.c_str());
+	}
+	else if (!isOneStepForward) {
+		TextHook::HandleText(game_names[SV.game], str_utterance, "");
+
+		LOG("scene is: \"%s\"", globalScene.c_str());
+		LOG("input text is: \"%s\"", str_utterance.c_str());
+		LOG("input bytes is: \"%s\"", str_matched_vid.c_str());
+
+		return;
+	}
+	else {
+		if (*t != '#') return;
 		t++;
+
+		unsigned num_vid = 0;
+		for (int i = 0; i < MAX_VOICEID_LEN; i++) {
+			if (*t < '0' || *t > '9') break;
+			num_vid *= 10; num_vid += *t - '0';
+			str_vid.push_back(*t);
+
+			t++;
+		}
+		if (*t != 'v' || str_vid.empty()) return;
+
+		LOG("input Voice ID is \"%s\"", str_vid.c_str());
+		LOG("The max length of voice id need mapping is %d", MAX_VOICEID_LEN_NEED_MAPPING);
+
+		if (str_vid.length() <= MAX_VOICEID_LEN_NEED_MAPPING) {
+			if (VC_isZa) {
+				LOG("Voice ID mapping is not supported in Zero/Ao, return");
+				return;
+			}
+
+			num_vid += VoiceIdAdjustAdder[str_vid.length()];
+			LOG("Adjusted Voice ID is %d", num_vid);
+			LOG("Number of mapping is %d", NUM_MAPPING);
+
+			if (num_vid >= NUM_MAPPING) {
+				LOG("Adjusted Voice ID is out of the range of Mapping");
+				return;
+			}
+
+			str_vid = VoiceIdMapping[num_vid];
+			if (str_vid.empty()) {
+				LOG("Mapping Voice ID is empty");
+				return;
+			}
+		}
 	}
-	if (*t != 'v' || str_vid.empty()) return;
 
-	LOG("input Voice ID is \"%s\"", str_vid.c_str());
-	LOG("The max length of voice id need mapping is %d", MAX_VOICEID_LEN_NEED_MAPPING);
-
-	if (str_vid.length() <= MAX_VOICEID_LEN_NEED_MAPPING) {
-		if(VC_isZa) {
-			LOG("Voice ID mapping is not supported in Zero/Ao, return");
-			return;
-		}
-
-		num_vid += VoiceIdAdjustAdder[str_vid.length()];
-		LOG("Adjusted Voice ID is %d", num_vid);
-		LOG("Number of mapping is %d", NUM_MAPPING);
-
-		if (num_vid >= NUM_MAPPING) {
-			LOG("Adjusted Voice ID is out of the range of Mapping");
-			return;
-		}
-
-		str_vid = VoiceIdMapping[num_vid];
-		if (str_vid.empty()) {
-			LOG("Mapping Voice ID is empty");
-			return;
-		}
-	}
-	
 	std::string oggFileName = VOICEFILE_DIR;
 	if (str_vid.length() == BGMVOICEID_LEN) {
 		oggFileName.append(VOICEFILE_PREFIX_BGM).append(str_vid.c_str() + sizeof(VOICEFILE_PREFIX_BGM) - 1);
@@ -248,7 +312,7 @@ void SoraVoice::Play(const char* t)
 
 	int volume = Config.Volume;
 
-	if(VC_isZa) {
+	if (VC_isZa) {
 		SV.status.playingOri = 0;
 		if (Config.OriginalVoice) {
 			++t;
@@ -327,7 +391,7 @@ void SoraVoice::Input()
 		info_time = INFINITY_TIME;
 		if (!last[KEY_ALLINFO]) {
 			Draw::RemoveInfo(InfoType::Volume);
-			if(SV.game == AO) {
+			if (SV.game == AO) {
 				Draw::RemoveInfo(InfoType::OriVolumePercent);
 				Draw::RemoveInfo(InfoType::OriginalVoice);
 			}
@@ -338,10 +402,10 @@ void SoraVoice::Input()
 			Draw::RemoveInfo(InfoType::DisableDududu);
 			Draw::RemoveInfo(InfoType::InfoOnoff);
 
-			if(SV.status.mute) AddInfo(InfoType::Volume, INFINITY_TIME, Config.FontColor, Message.Mute);
+			if (SV.status.mute) AddInfo(InfoType::Volume, INFINITY_TIME, Config.FontColor, Message.Mute);
 			else AddInfo(InfoType::Volume, INFINITY_TIME, Config.FontColor, Message.Volume, Config.Volume);
 
-			if(SV.game == AO) {
+			if (SV.game == AO) {
 				AddInfo(InfoType::OriVolumePercent, INFINITY_TIME, Config.FontColor, Message.OriVolumePercent, Config.OriVolumePercent, "%");
 				AddInfo(InfoType::OriginalVoice, INFINITY_TIME, Config.FontColor, Message.OriginalVoice, Message.OriginalVoiceSwitch[Config.OriginalVoice]);
 			}
@@ -354,7 +418,7 @@ void SoraVoice::Input()
 	}
 	else if (last[KEY_ALLINFO]) {
 		Draw::RemoveInfo(InfoType::Volume);
-		if(SV.game == AO) {
+		if (SV.game == AO) {
 			Draw::RemoveInfo(InfoType::OriVolumePercent);
 			Draw::RemoveInfo(InfoType::OriginalVoice);
 		}
@@ -388,7 +452,7 @@ void SoraVoice::Input()
 		if (Config.ShowInfo || info_time == INFINITY_TIME) {
 			//Draw::AddText(InfoType::ConfigReset, INFO_TIME, config.FontColor, Message.Reset);
 			AddInfo(InfoType::Volume, info_time, Config.FontColor, Message.Volume, Config.Volume);
-			if(SV.game == AO) {
+			if (SV.game == AO) {
 				AddInfo(InfoType::OriVolumePercent, info_time, Config.FontColor, Message.OriVolumePercent, Config.OriVolumePercent, "%");
 				AddInfo(InfoType::OriginalVoice, info_time, Config.FontColor, Message.OriginalVoice, Message.OriginalVoiceSwitch[Config.OriginalVoice]);
 			}
@@ -456,7 +520,7 @@ void SoraVoice::Input()
 			LOG("Set mute : %d", SV.status.mute);
 		}//keys[KEY_VOLUME_UP] && keys[KEY_VOLUME_DOWN]
 
-		if(SV.game == AO) {
+		if (SV.game == AO) {
 			if (keys[KEY_ORIVOLPCT_UP] && !last[KEY_ORIVOLPCT_UP] && !keys[KEY_ORIVOLPCT_DOWN]) {
 				needsetvolume = Config.OriVolumePercent != ORIVOLPCT_STEP;
 				needsave = needsetvolume;
@@ -586,7 +650,7 @@ void SoraVoice::Input()
 				Draw::RemoveInfo(InfoType::AutoPlayMark);
 				Draw::RemoveInfo(InfoType::Hello);
 			}
-			else { 
+			else {
 				Draw::RemoveInfo(InfoType::All);
 			}
 			AddInfo(InfoType::InfoOnoff, info_time, Config.FontColor, Message.ShowInfo, Message.ShowInfoSwitch[Config.ShowInfo]);
@@ -599,8 +663,8 @@ void SoraVoice::Input()
 		if (SV.status.playing) {
 			if (!SV.status.mute) {
 				int volume = SV.status.playingOri ?
-							Config.Volume * Config.OriVolumePercent / 100 :
-							Config.Volume;
+					Config.Volume * Config.OriVolumePercent / 100 :
+					Config.Volume;
 				if (volume > Config.MAX_Volume) volume = Config.MAX_Volume;
 				Player::SetVolume(volume);
 			}
@@ -623,7 +687,7 @@ void SoraVoice::Show(void* pD3DD)
 	Clock::UpdateTime();
 	const auto& aup = VC_aup;
 
-	if(!VC_isZa) SoraVoice::Input();
+	if (!VC_isZa) SoraVoice::Input();
 
 	if (SV.status.showing && Draw::RemoveInfo(InfoType::Dead)) {
 		Draw::DrawInfos(pD3DD);
@@ -632,7 +696,7 @@ void SoraVoice::Show(void* pD3DD)
 	if (SV.status.first_text) {
 		SV.status.first_text = 0;
 		if (Config.ShowInfo == CConfig::ShowInfo_WithMark && isAutoPlaying()) {
-			AddInfo(InfoType::AutoPlayMark, Draw::ShowTimeInfinity, Config.FontColor ,Message.AutoPlayMark);
+			AddInfo(InfoType::AutoPlayMark, Draw::ShowTimeInfinity, Config.FontColor, Message.AutoPlayMark);
 		}
 	}
 
@@ -657,7 +721,7 @@ void SoraVoice::Show(void* pD3DD)
 			SV.order.disableDududu = 0;
 		}
 
-		if (aup->wait && aup->time_autoplay <= aup->now 
+		if (aup->wait && aup->time_autoplay <= aup->now
 			&& (!aup->waitv || aup->time_autoplayv <= aup->now)) {
 			LOG("now = %d", aup->now);
 			LOG("waitv = %d", aup->waitv);
@@ -706,11 +770,11 @@ bool SoraVoice::Init() {
 
 	VC_keys = new Keys(SV.addrs.p_keys, *SV.addrs.p_did);
 	VC_aup = new AutoPlay(SV.rcd.now, SV.rcd.count_ch, SV.status.wait,
-						SV.rcd.time_textbeg, SV.status.waitv);
+		SV.rcd.time_textbeg, SV.status.waitv);
 
 	static_assert(CConfig::MAX_Volume == Player::MaxVolume, "Max Volume not same!");
 
-	if(VC_isZa) {
+	if (VC_isZa) {
 		if (Config.EnableKeys) {
 			LOG("Now going to hook GetDeviceState...");
 			void* pGetDeviceState = Hook::Hook_DI_GetDeviceState(*SV.addrs.p_did, SoraVoice::Input, (void**)&SV.addrs.p_keys);

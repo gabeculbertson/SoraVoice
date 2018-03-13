@@ -29,6 +29,19 @@ NACKED void ASM::text() {
 		cmp     byte ptr[eax], 0x20;
 		jb      jcode;
 
+		// TEST CODE
+		push    ecx;
+		push    edx;
+		push    eax;
+		call    ASM_Play;
+		pop     edx;
+		pop     ecx;
+
+		pop     eax;
+		push    dword ptr[SV.jcs.text.to];
+		ret     4;
+		// END TEST CODE
+
 		cmp     byte ptr[eax], '#';
 		jnz     short checkcode;
 

@@ -5,6 +5,10 @@
 #include "dir_3rd.h"
 #include "dir_3rd_quiz.h"
 
+#include <string>
+
+using namespace std;
+
 constexpr int MAX_NAME_LEN = 12;
 constexpr int NUM_FC = sizeof(DIR_FC) / sizeof(*DIR_FC);
 constexpr int NUM_SC = sizeof(DIR_SC) / sizeof(*DIR_SC);
