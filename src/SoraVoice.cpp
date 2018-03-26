@@ -224,21 +224,52 @@ std::string ToHexStringKey(const byte* data, int len)
 
 std::string lastPlayed = "";
 int lastCharPointer = 0;
+int startOfStringIndex = -1;
+int endOfStringIndex = -1;
+char lastBuffer[MAX_TEXTBOX_STRING_LEN];
+
+bool BufferChanged(const char* t) {
+	int checkCount = endOfStringIndex - (int)t;
+	for (int i = (int)t - startOfStringIndex; i < checkCount; i++) {
+		if (*(t + i) != lastBuffer[i]) {
+			LOG("[%d] %d != %d", i, (long)*(t + i), (long)lastBuffer[i]);
+			return true;
+		}
+	}
+	return false;
+}
+
 void SoraVoice::Play(const char* t)
 {
 	if (!SV.status.startup) return;
 
-	bool isOneStepForward = abs((int)t - lastCharPointer) <= 4;
+	bool isForward = (int)t > lastCharPointer;
 	lastCharPointer = (int)t;
+
+	LOG("pointer is: %d     %d       %d", (int)t, startOfStringIndex, endOfStringIndex);
+	if (isForward && (int)t >= startOfStringIndex && (int)t <= endOfStringIndex) return;
+
+	/*int lastLastCharPointer = lastCharPointer;
+	bool isOneStepForward = abs((int)t - lastCharPointer) < 4;
+	lastCharPointer = (int)t;
+
+	LOG("pointer is: %d     %d", lastLastCharPointer, lastCharPointer);
+	if (*t < 0x04) lastCharPointer = 0;*/
+	/*char cm1 = *(t - 1);
+	char cm2 = *(t - 2);
+	if (cm1 >= 'A' && cm1 <= 'Z' && cm2 >= '0' && cm2 <= '9') isOneStepForward = true;*/
 
 	std::string str_utterance;
 	for (int i = 0; i < MAX_TEXTBOX_STRING_LEN; i++) {
-		if (*(t + i) == 0x02) break;
+		if (*(t + i) == 0x02) {
+			startOfStringIndex = (int)t;
+			endOfStringIndex = (int)t + i;
+			break;
+		}
 		str_utterance.push_back(*(t + i));
+		lastBuffer[i] = *(t + i);
 	}
 	std::string str_matched_vid = ToHexStringKey((byte*)t, str_utterance.length());
-
-	LOG("scene is: %d     %d", lastCharPointer, (int)t);
 
 	std::string str_vid;
 	if (globalSceneLines.count(str_matched_vid) > 0) {
@@ -248,16 +279,16 @@ void SoraVoice::Play(const char* t)
 		lastPlayed = str_matched_vid;
 		TextHook::HandleText(game_names[SV.game], str_utterance, str_vid);
 
-		LOG("scene is: \"%s\"", globalScene.c_str());
-		LOG("input text is: \"%s\"", str_utterance.c_str());
-		LOG("input bytes is: \"%s\"", str_matched_vid.c_str());
+		//LOG("scene is: \"%s\"", globalScene.c_str());
+		LOG("audio text: \"%s\"", str_utterance.c_str());
+		LOG("bytes: \"%s\"", str_matched_vid.c_str());
 	}
-	else if (!isOneStepForward) {
+	else if (str_utterance.length() > 2) {
 		TextHook::HandleText(game_names[SV.game], str_utterance, "");
 
-		LOG("scene is: \"%s\"", globalScene.c_str());
-		LOG("input text is: \"%s\"", str_utterance.c_str());
-		LOG("input bytes is: \"%s\"", str_matched_vid.c_str());
+		//LOG("scene is: \"%s\"", globalScene.c_str());
+		LOG("non-audio text: \"%s\"", str_utterance.c_str());
+		LOG("bytes: \"%s\"", str_matched_vid.c_str());
 
 		return;
 	}

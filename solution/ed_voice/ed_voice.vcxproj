@@ -69,7 +69,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PreprocessorDefinitions>DBG_VER;_SVDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalUsingDirectories>C:\Users\gabeculbertson\Documents\GitHub\GameTextHook\SoraVoiceLib\bin\Debug;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
+      <AdditionalUsingDirectories>C:\Users\Gabriel Culbertson\Documents\GitHub\GameTextHook\SoraVoiceLib\bin\Debug;C:\Users\gabeculbertson\Documents\GitHub\GameTextHook\SoraVoiceLib\bin\Debug;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
       <DebugInformationFormat>None</DebugInformationFormat>
       <ExceptionHandling>Async</ExceptionHandling>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -83,7 +83,7 @@
     <ClCompile>
       <PreprocessorDefinitions>LOG_NOLOG;_SVDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <AdditionalUsingDirectories>C:\Users\gabeculbertson\Documents\GitHub\GameTextHook\SoraVoiceLib\bin\Debug;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
+      <AdditionalUsingDirectories>C:\Users\Gabriel Culbertson\Documents\GitHub\GameTextHook\SoraVoiceLib\bin\Debug;C:\Users\gabeculbertson\Documents\GitHub\GameTextHook\SoraVoiceLib\bin\Debug;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>d3dx8.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
