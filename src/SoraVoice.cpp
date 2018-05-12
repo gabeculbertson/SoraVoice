@@ -100,7 +100,7 @@ constexpr unsigned TIME_PREC = 16;
 
 constexpr int KEYS_NUM = 256;
 
-std::string game_names[] = { "invalid", "ed6fc", "ed6sc", "ed6t3" };
+std::string game_names[] = { "invalid", "ed6fc", "ed6sc", "ed6t3", "ed7z" };
 
 struct Keys {
 	const byte* const &keys;
@@ -231,6 +231,7 @@ void SoraVoice::Play(const char* t)
 	bool isOneStepForward = abs((int)t - lastCharPointer) <= 4;
 	lastCharPointer = (int)t;
 
+	std::string str_vid;
 	std::string str_utterance;
 	for (int i = 0; i < MAX_TEXTBOX_STRING_LEN; i++) {
 		if (*(t + i) == 0x02) break;
@@ -238,9 +239,9 @@ void SoraVoice::Play(const char* t)
 	}
 	std::string str_matched_vid = ToHexStringKey((byte*)t, str_utterance.length());
 
-	LOG("scene is: %d     %d", lastCharPointer, (int)t);
+	LOG("last pointer, pointer: %d     %d", lastCharPointer, (int)t);
+	LOG("utterance: %s", str_utterance.c_str());
 
-	std::string str_vid;
 	if (globalSceneLines.count(str_matched_vid) > 0) {
 		if (lastPlayed == str_matched_vid) return;
 
@@ -253,6 +254,8 @@ void SoraVoice::Play(const char* t)
 		LOG("input bytes is: \"%s\"", str_matched_vid.c_str());
 	}
 	else if (!isOneStepForward) {
+		LOG("game is: %d", SV.game);
+		LOG("game is: %s", game_names[SV.game]);
 		TextHook::HandleText(game_names[SV.game], str_utterance, "");
 
 		LOG("scene is: \"%s\"", globalScene.c_str());
@@ -264,6 +267,8 @@ void SoraVoice::Play(const char* t)
 	else {
 		if (*t != '#') return;
 		t++;
+
+		str_vid.clear();
 
 		unsigned num_vid = 0;
 		for (int i = 0; i < MAX_VOICEID_LEN; i++) {
