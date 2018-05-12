@@ -224,6 +224,21 @@ std::string ToHexStringKey(const byte* data, int len)
 
 std::string lastPlayed = "";
 int lastCharPointer = 0;
+int startOfStringIndex = -1;
+int endOfStringIndex = -1;
+char lastBuffer[MAX_TEXTBOX_STRING_LEN];
+
+bool BufferChanged(const char* t) {
+	int checkCount = endOfStringIndex - (int)t;
+	for (int i = (int)t - startOfStringIndex; i < checkCount; i++) {
+		if (*(t + i) != lastBuffer[i]) {
+			LOG("[%d] %d != %d", i, (long)*(t + i), (long)lastBuffer[i]);
+			return true;
+		}
+	}
+	return false;
+}
+
 void SoraVoice::Play(const char* t)
 {
 	if (!SV.status.startup) return;
